@@ -1,0 +1,344 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trò Chơi Trắc Nghiệm Lượng Giác</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .question-card {
+            transform: translateY(20px);
+            opacity: 0;
+            animation: slideIn 0.5s ease-out forwards;
+        }
+        @keyframes slideIn {
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        .correct-answer {
+            background: linear-gradient(135deg, #10b981, #059669);
+            animation: pulse 0.6s ease-in-out;
+        }
+        .wrong-answer {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            animation: shake 0.5s ease-in-out;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+        .progress-bar {
+            transition: width 0.3s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-800 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-white mb-4">
+                🧮 Trắc Nghiệm Lượng Giác
+            </h1>
+            <p class="text-xl text-purple-200">Thử thách kiến thức toán học của bạn!</p>
+        </div>
+
+        <!-- Game Stats -->
+        <div class="bg-white/10 backdrop-blur-lg rounded-2xl p-6 mb-8 border border-white/20">
+            <div class="flex justify-between items-center mb-4">
+                <div class="text-white">
+                    <span class="text-lg font-semibold">Câu hỏi: </span>
+                    <span id="currentQuestion" class="text-2xl font-bold text-yellow-300">1</span>
+                    <span class="text-lg">/ 10</span>
+                </div>
+                <div class="text-white">
+                    <span class="text-lg font-semibold">Điểm: </span>
+                    <span id="score" class="text-2xl font-bold text-green-300">0</span>
+                </div>
+            </div>
+            <div class="w-full bg-white/20 rounded-full h-3">
+                <div id="progressBar" class="progress-bar bg-gradient-to-r from-yellow-400 to-orange-500 h-3 rounded-full" style="width: 10%"></div>
+            </div>
+        </div>
+
+        <!-- Question Card -->
+        <div id="questionCard" class="question-card bg-white/15 backdrop-blur-lg rounded-3xl p-8 mb-8 border border-white/30 shadow-2xl">
+            <div class="text-center mb-8">
+                <h2 id="questionText" class="text-2xl md:text-3xl font-bold text-white mb-4">
+                    sin(30°) bằng bao nhiêu?
+                </h2>
+                <div id="questionImage" class="text-6xl mb-4">📐</div>
+            </div>
+
+            <div id="answersContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button class="answer-btn bg-white/20 hover:bg-white/30 text-white font-semibold py-4 px-6 rounded-xl border border-white/30 transition-all duration-300 transform hover:scale-105" data-answer="0.5">
+                    A) 1/2
+                </button>
+                <button class="answer-btn bg-white/20 hover:bg-white/30 text-white font-semibold py-4 px-6 rounded-xl border border-white/30 transition-all duration-300 transform hover:scale-105" data-answer="0.866">
+                    B) √3/2
+                </button>
+                <button class="answer-btn bg-white/20 hover:bg-white/30 text-white font-semibold py-4 px-6 rounded-xl border border-white/30 transition-all duration-300 transform hover:scale-105" data-answer="1">
+                    C) 1
+                </button>
+                <button class="answer-btn bg-white/20 hover:bg-white/30 text-white font-semibold py-4 px-6 rounded-xl border border-white/30 transition-all duration-300 transform hover:scale-105" data-answer="0.707">
+                    D) √2/2
+                </button>
+            </div>
+        </div>
+
+        <!-- Next Button -->
+        <div class="text-center">
+            <button id="nextBtn" class="bg-gradient-to-r from-green-500 to-blue-600 hover:from-green-600 hover:to-blue-700 text-white font-bold py-4 px-8 rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                Câu tiếp theo →
+            </button>
+        </div>
+
+        <!-- Results Modal -->
+        <div id="resultsModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50">
+            <div class="bg-white/20 backdrop-blur-lg rounded-3xl p-8 m-4 max-w-md w-full border border-white/30">
+                <div class="text-center">
+                    <div id="resultEmoji" class="text-8xl mb-4">🎉</div>
+                    <h3 class="text-3xl font-bold text-white mb-4">Hoàn thành!</h3>
+                    <p class="text-xl text-purple-200 mb-6">
+                        Bạn đã trả lời đúng <span id="finalScore" class="font-bold text-yellow-300">0</span>/10 câu hỏi
+                    </p>
+                    <div id="resultMessage" class="text-lg text-white mb-6">
+                        Xuất sắc! Bạn là bậc thầy lượng giác! 🏆
+                    </div>
+                    <button id="playAgainBtn" class="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-xl shadow-lg transform transition-all duration-300 hover:scale-105">
+                        Chơi lại
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const questions = [
+            {
+                question: "sin(30°) bằng bao nhiêu?",
+                answers: ["1/2", "√3/2", "1", "√2/2"],
+                correct: 0,
+                emoji: "📐"
+            },
+            {
+                question: "cos(60°) bằng bao nhiêu?",
+                answers: ["1/2", "√3/2", "1", "0"],
+                correct: 0,
+                emoji: "📏"
+            },
+            {
+                question: "tan(45°) bằng bao nhiêu?",
+                answers: ["1", "√3", "1/√3", "0"],
+                correct: 0,
+                emoji: "📊"
+            },
+            {
+                question: "sin(90°) bằng bao nhiêu?",
+                answers: ["0", "1", "1/2", "√3/2"],
+                correct: 1,
+                emoji: "📈"
+            },
+            {
+                question: "cos(0°) bằng bao nhiêu?",
+                answers: ["0", "1", "1/2", "-1"],
+                correct: 1,
+                emoji: "🎯"
+            },
+            {
+                question: "Trong tam giác vuông, sin(α) bằng:",
+                answers: ["cạnh kề/cạnh huyền", "cạnh đối/cạnh huyền", "cạnh đối/cạnh kề", "cạnh huyền/cạnh đối"],
+                correct: 1,
+                emoji: "△"
+            },
+            {
+                question: "tan(60°) bằng bao nhiêu?",
+                answers: ["1", "√3", "1/√3", "2"],
+                correct: 1,
+                emoji: "📐"
+            },
+            {
+                question: "sin²(x) + cos²(x) bằng:",
+                answers: ["0", "1", "2", "tan(x)"],
+                correct: 1,
+                emoji: "🔢"
+            },
+            {
+                question: "cos(90°) bằng bao nhiêu?",
+                answers: ["1", "0", "-1", "1/2"],
+                correct: 1,
+                emoji: "📏"
+            },
+            {
+                question: "Chu kỳ của hàm sin(x) là:",
+                answers: ["π", "2π", "π/2", "4π"],
+                correct: 1,
+                emoji: "🌊"
+            }
+        ];
+
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let selectedAnswer = null;
+
+        const questionText = document.getElementById('questionText');
+        const questionImage = document.getElementById('questionImage');
+        const answersContainer = document.getElementById('answersContainer');
+        const nextBtn = document.getElementById('nextBtn');
+        const currentQuestionSpan = document.getElementById('currentQuestion');
+        const scoreSpan = document.getElementById('score');
+        const progressBar = document.getElementById('progressBar');
+        const resultsModal = document.getElementById('resultsModal');
+        const finalScore = document.getElementById('finalScore');
+        const resultMessage = document.getElementById('resultMessage');
+        const resultEmoji = document.getElementById('resultEmoji');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+
+        function loadQuestion() {
+            const question = questions[currentQuestionIndex];
+            questionText.textContent = question.question;
+            questionImage.textContent = question.emoji;
+            
+            answersContainer.innerHTML = '';
+            question.answers.forEach((answer, index) => {
+                const button = document.createElement('button');
+                button.className = 'answer-btn bg-white/20 hover:bg-white/30 text-white font-semibold py-4 px-6 rounded-xl border border-white/30 transition-all duration-300 transform hover:scale-105';
+                button.textContent = `${String.fromCharCode(65 + index)}) ${answer}`;
+                button.addEventListener('click', () => selectAnswer(index, button));
+                answersContainer.appendChild(button);
+            });
+
+            currentQuestionSpan.textContent = currentQuestionIndex + 1;
+            progressBar.style.width = `${((currentQuestionIndex + 1) / questions.length) * 100}%`;
+            nextBtn.disabled = true;
+            selectedAnswer = null;
+
+            // Reset animation
+            document.getElementById('questionCard').style.animation = 'none';
+            setTimeout(() => {
+                document.getElementById('questionCard').style.animation = 'slideIn 0.5s ease-out forwards';
+            }, 10);
+        }
+
+        function selectAnswer(answerIndex, buttonElement) {
+            if (selectedAnswer !== null) return;
+
+            selectedAnswer = answerIndex;
+            const question = questions[currentQuestionIndex];
+            const isCorrect = answerIndex === question.correct;
+
+            // Disable all buttons
+            document.querySelectorAll('.answer-btn').forEach(btn => {
+                btn.style.pointerEvents = 'none';
+            });
+
+            if (isCorrect) {
+                score++;
+                scoreSpan.textContent = score;
+                buttonElement.className += ' correct-answer';
+            } else {
+                buttonElement.className += ' wrong-answer';
+                // Show correct answer
+                document.querySelectorAll('.answer-btn')[question.correct].className += ' correct-answer';
+            }
+
+            nextBtn.disabled = false;
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex < questions.length) {
+                loadQuestion();
+            } else {
+                showResults();
+            }
+        }
+
+        function showResults() {
+            const percentage = (score / questions.length) * 100;
+            finalScore.textContent = score;
+            
+            if (percentage >= 90) {
+                resultMessage.textContent = "Xuất sắc! Bạn là bậc thầy lượng giác! 🏆";
+                resultEmoji.textContent = "🏆";
+            } else if (percentage >= 70) {
+                resultMessage.textContent = "Tốt lắm! Bạn có kiến thức vững chắc! 👏";
+                resultEmoji.textContent = "👏";
+            } else if (percentage >= 50) {
+                resultMessage.textContent = "Khá ổn! Hãy ôn tập thêm nhé! 📚";
+                resultEmoji.textContent = "📚";
+            } else {
+                resultMessage.textContent = "Cần cố gắng hơn! Đừng bỏ cuộc! 💪";
+                resultEmoji.textContent = "💪";
+            }
+
+            resultsModal.classList.remove('hidden');
+            resultsModal.classList.add('flex');
+        }
+
+        function resetGame() {
+            currentQuestionIndex = 0;
+            score = 0;
+            selectedAnswer = null;
+            scoreSpan.textContent = '0';
+            resultsModal.classList.add('hidden');
+            resultsModal.classList.remove('flex');
+            loadQuestion();
+        }
+
+        // Event listeners
+        nextBtn.addEventListener('click', nextQuestion);
+        playAgainBtn.addEventListener('click', resetGame);
+
+        // Initialize game
+        loadQuestion();
+    </script>
+</body>
+</html>
